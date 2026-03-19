@@ -2,3 +2,5 @@
 dist/
 .derivedData/
 .build/
+*.swp
+*.tmp
