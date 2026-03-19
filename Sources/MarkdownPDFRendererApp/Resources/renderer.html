@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <base id="doc-base" href="" />
+  <title>Markdown PDF Renderer</title>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #FAF9F5;
+      --bg-soft: #E8E6DC;
+      --text: #141413;
+      --muted: #B0AEA5;
+      --border: #B0AEA5;
+      --accent: #D97757;
+      --accent-2: #6A9BCC;
+      --accent-3: #788C5D;
+      --link: #D97757;
+      --code-bg: #E8E6DC;
+      --quote-bg: rgba(106, 155, 204, 0.10);
+      --shadow: 0 10px 30px rgba(20, 20, 19, 0.06);
+      --radius: 16px;
+      --content-width: 980px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    html,
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "SF Pro TC", "SF Pro Text", "PingFang TC", "Noto Sans TC", sans-serif;
+      line-height: 1.8;
+      text-rendering: optimizeLegibility;
+    }
+
+    .page-shell {
+      min-height: 100vh;
+      background: var(--bg);
+      padding: 20px 16px 40px;
+    }
+
+    .content {
+      width: min(var(--content-width), calc(100% - 8px));
+      margin: 0 auto;
+    }
+
+    .render-card {
+      background: #ffffff;
+      border: 1px solid rgba(176, 174, 165, 0.65);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: visible;
+    }
+
+    #content {
+      padding: 32px 24px 40px;
+    }
+
+    #content > :first-child { margin-top: 0; }
+
+    #content h1,
+    #content h2,
+    #content h3,
+    #content h4,
+    #content h5,
+    #content h6 {
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+      margin-top: 1.8em;
+      margin-bottom: 0.72em;
+    }
+
+    #content h1 { font-size: 2.2rem; margin-top: 0.2em; }
+    #content h2 { font-size: 1.6rem; padding-bottom: 0.25rem; border-bottom: 2px solid var(--accent); }
+    #content h3 { font-size: 1.26rem; color: var(--accent-3); }
+    #content h4 { font-size: 1.08rem; color: var(--accent-2); }
+    #content p, #content li { font-size: 1.04rem; }
+
+    #content a {
+      color: var(--link);
+      text-decoration-thickness: 1.5px;
+      text-decoration-color: rgba(217, 119, 87, 0.35);
+      text-underline-offset: 2px;
+    }
+
+    #content a:hover { text-decoration-color: rgba(217, 119, 87, 0.8); }
+    #content ul, #content ol { padding-left: 1.45rem; }
+    #content hr { border: 0; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+    #content blockquote {
+      margin: 1.25rem 0;
+      padding: 0.35rem 1rem;
+      border-left: 4px solid var(--accent-2);
+      border-radius: 0 10px 10px 0;
+      background: var(--quote-bg);
+      color: rgba(20, 20, 19, 0.92);
+    }
+
+    #content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.25rem 0;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 1px 0 rgba(20, 20, 19, 0.04);
+    }
+
+    #content th,
+    #content td {
+      border: 1px solid rgba(176, 174, 165, 0.65);
+      padding: 0.72rem 0.84rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    #content th { background: var(--bg-soft); }
+
+    #content img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 12px;
+      margin: 1.2rem auto;
+      box-shadow: 0 12px 28px rgba(20, 20, 19, 0.08);
+    }
+
+    #content code {
+      font-family: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+      font-size: 0.92em;
+      background: var(--code-bg);
+      padding: 0.14rem 0.34rem;
+      border-radius: 6px;
+    }
+
+    #content pre {
+      margin: 1.25rem 0;
+      padding: 1rem 1.05rem;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(176, 174, 165, 0.65);
+      background: var(--code-bg);
+      box-shadow: inset 0 1px 0 rgba(250, 249, 245, 0.8);
+    }
+
+    #content pre code {
+      padding: 0;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    #content .mermaid {
+      margin: 1.5rem 0;
+      padding: 1rem;
+      overflow-x: auto;
+      border: 1px solid rgba(176, 174, 165, 0.65);
+      border-radius: 14px;
+      background: #ffffff;
+    }
+
+    #content mjx-container[display="true"] {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0.25rem 0;
+    }
+
+    .callout {
+      margin: 1.2rem 0;
+      padding: 1rem 1.1rem;
+      border: 1px solid rgba(176, 174, 165, 0.65);
+      border-left-width: 6px;
+      border-radius: 12px;
+      background: var(--bg-soft);
+    }
+
+    .callout.orange { border-left-color: var(--accent); }
+
+    @media (max-width: 720px) {
+      #content { padding: 24px 16px 32px; }
+      #content h1 { font-size: 1.85rem; }
+      #content h2 { font-size: 1.4rem; }
+      #content p, #content li { font-size: 1rem; }
+    }
+
+    @media print {
+      @page {
+        margin: 12mm;
+      }
+
+      html,
+      body,
+      .page-shell,
+      .content,
+      .render-card,
+      #content table,
+      #content th,
+      #content td,
+      #content pre,
+      #content code,
+      #content blockquote,
+      #content .callout,
+      #content .mermaid {
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        background-image: none !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .page-shell,
+      .content,
+      .render-card {
+        width: 100%;
+        padding: 0;
+        margin: 0;
+        min-height: auto !important;
+        overflow: visible !important;
+      }
+
+      .render-card,
+      #content table,
+      #content img,
+      #content pre {
+        box-shadow: none !important;
+      }
+
+      .render-card {
+        border: 0 !important;
+        border-radius: 0;
+      }
+
+      #content {
+        padding: 20px 18px 24px;
+      }
+
+      #content pre,
+      #content code,
+      #content blockquote,
+      #content th,
+      #content td,
+      #content .callout,
+      #content .mermaid {
+        border-color: #d9d9d9 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <main class="content">
+      <section class="render-card">
+        <article id="content"></article>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+
+    const content = document.getElementById('content');
+
+    marked.setOptions({
+      gfm: true,
+      breaks: false,
+      headerIds: true,
+      mangle: false
+    });
+
+    function setBaseHref(baseHref) {
+      const baseElement = document.getElementById('doc-base');
+      if (baseElement && baseHref) {
+        baseElement.setAttribute('href', baseHref);
+      }
+    }
+
+    function hasExternalScheme(value) {
+      return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value) || value.startsWith('//');
+    }
+
+    function buildAssetCandidates(rawValue, markdownBaseHref, sourceRootHref) {
+      if (!rawValue || rawValue.startsWith('#') || hasExternalScheme(rawValue)) {
+        return [];
+      }
+
+      const normalized = rawValue.trim();
+      const candidates = [];
+
+      try {
+        candidates.push(new URL(normalized, markdownBaseHref).toString());
+      } catch {}
+
+      if (sourceRootHref) {
+        try {
+          candidates.push(new URL(normalized, sourceRootHref).toString());
+        } catch {}
+
+        if (normalized.startsWith('./')) {
+          try {
+            candidates.push(new URL(normalized.slice(2), sourceRootHref).toString());
+          } catch {}
+        }
+      }
+
+      return [...new Set(candidates)];
+    }
+
+    function installFallbackSource(element, attributeName, candidates) {
+      if (!candidates.length) {
+        return;
+      }
+
+      let candidateIndex = 0;
+      element.setAttribute(attributeName, candidates[candidateIndex]);
+
+      if (attributeName !== 'src' || candidates.length === 1) {
+        return;
+      }
+
+      element.addEventListener('error', () => {
+        candidateIndex += 1;
+        if (candidateIndex < candidates.length) {
+          element.setAttribute(attributeName, candidates[candidateIndex]);
+        }
+      }, { once: false });
+    }
+
+    function resolveRelativeAssetURLs(markdownBaseHref, sourceRootHref) {
+      const selectors = [
+        ['img[src]', 'src'],
+        ['source[src]', 'src'],
+        ['audio[src]', 'src'],
+        ['video[src]', 'src'],
+        ['a[href]', 'href']
+      ];
+
+      selectors.forEach(([selector, attributeName]) => {
+        content.querySelectorAll(selector).forEach((element) => {
+          const rawValue = element.getAttribute(attributeName);
+          const candidates = buildAssetCandidates(rawValue, markdownBaseHref, sourceRootHref);
+          if (!candidates.length) {
+            return;
+          }
+
+          installFallbackSource(element, attributeName, candidates);
+        });
+      });
+    }
+
+    function ensureExportStyle(width, height) {
+      let style = document.getElementById('codex-single-page-export-style');
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'codex-single-page-export-style';
+        document.head.appendChild(style);
+      }
+
+      style.textContent = `
+        @media print {
+          @page {
+            size: ${Math.ceil(width)}px ${Math.ceil(height)}px;
+            margin: 0;
+          }
+
+          html,
+          body {
+            width: ${Math.ceil(width)}px !important;
+            height: ${Math.ceil(height)}px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+          }
+
+          .page-shell,
+          .content,
+          .render-card {
+            width: ${Math.ceil(width)}px !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `;
+    }
+
+    function clearExportStyle() {
+      document.getElementById('codex-single-page-export-style')?.remove();
+    }
+
+    function getExportMetrics() {
+      const content = document.getElementById('content');
+      const card = document.querySelector('.render-card');
+      const body = document.body;
+      const html = document.documentElement;
+
+      return {
+        width: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        height: Math.max(
+          html?.scrollHeight || 0,
+          html?.offsetHeight || 0,
+          body?.scrollHeight || 0,
+          body?.offsetHeight || 0,
+          card?.scrollHeight || 0,
+          content?.scrollHeight || 0
+        )
+      };
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function protectInlineDollarMath(text, stashMath) {
+      let result = '';
+
+      for (let index = 0; index < text.length; index += 1) {
+        const currentChar = text[index];
+        const previousChar = index > 0 ? text[index - 1] : '';
+        const nextChar = index + 1 < text.length ? text[index + 1] : '';
+
+        if (currentChar !== '$' || previousChar === '\\' || nextChar === '$') {
+          result += currentChar;
+          continue;
+        }
+
+        let closingIndex = index + 1;
+        let foundClosingDollar = false;
+
+        while (closingIndex < text.length) {
+          const closingChar = text[closingIndex];
+          const closingPrevChar = text[closingIndex - 1];
+
+          if (closingChar === '\n') {
+            break;
+          }
+
+          if (closingChar === '$' && closingPrevChar !== '\\') {
+            foundClosingDollar = true;
+            break;
+          }
+
+          closingIndex += 1;
+        }
+
+        if (!foundClosingDollar) {
+          result += currentChar;
+          continue;
+        }
+
+        result += stashMath(text.slice(index, closingIndex + 1));
+        index = closingIndex;
+      }
+
+      return result;
+    }
+
+    function protectMath(markdownText) {
+      const placeholders = [];
+      const codeFenceRegex = /```[\s\S]*?```|~~~[\s\S]*?~~~/g;
+
+      function stashMath(mathText) {
+        const placeholder = `CODEXMATHTOKEN${placeholders.length}END`;
+        placeholders.push({ placeholder, mathText });
+        return placeholder;
+      }
+
+      function protectMathInSegment(segmentText) {
+        let protectedText = segmentText;
+        const blockMathPatterns = [
+          /\$\$[\s\S]*?\$\$/g,
+          /\\\[[\s\S]*?\\\]/g,
+          /\\\([\s\S]*?\\\)/g
+        ];
+
+        blockMathPatterns.forEach((pattern) => {
+          protectedText = protectedText.replace(pattern, (match) => stashMath(match));
+        });
+
+        return protectInlineDollarMath(protectedText, stashMath);
+      }
+
+      let protectedMarkdown = '';
+      let lastIndex = 0;
+
+      for (const match of markdownText.matchAll(codeFenceRegex)) {
+        const matchIndex = match.index ?? 0;
+        protectedMarkdown += protectMathInSegment(markdownText.slice(lastIndex, matchIndex));
+        protectedMarkdown += match[0];
+        lastIndex = matchIndex + match[0].length;
+      }
+
+      protectedMarkdown += protectMathInSegment(markdownText.slice(lastIndex));
+
+      return { protectedMarkdown, placeholders };
+    }
+
+    function restoreMath(renderedHtml, placeholders) {
+      let restoredHtml = renderedHtml;
+
+      placeholders.forEach(({ placeholder, mathText }) => {
+        restoredHtml = restoredHtml.replaceAll(placeholder, mathText);
+      });
+
+      return restoredHtml;
+    }
+
+    function renderMarkdown(markdownText) {
+      const { protectedMarkdown, placeholders } = protectMath(markdownText);
+      const renderedHtml = marked.parse(protectedMarkdown);
+      content.innerHTML = restoreMath(renderedHtml, placeholders);
+    }
+
+    function convertMermaidBlocks() {
+      const mermaidCodeBlocks = content.querySelectorAll('pre code.language-mermaid');
+      mermaidCodeBlocks.forEach((codeBlock, index) => {
+        const pre = codeBlock.closest('pre');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mermaid';
+        wrapper.id = `mermaid-${index}`;
+        wrapper.textContent = codeBlock.textContent;
+        pre.replaceWith(wrapper);
+      });
+    }
+
+    async function waitForMathJax() {
+      for (let index = 0; index < 100; index += 1) {
+        if (window.MathJax?.typesetPromise) {
+          return;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+      }
+
+      throw new Error('MathJax 載入逾時。');
+    }
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#E8E6DC',
+        primaryTextColor: '#141413',
+        primaryBorderColor: '#B0AEA5',
+        lineColor: '#6A9BCC',
+        secondaryColor: '#FAF9F5',
+        tertiaryColor: '#FAF9F5',
+        clusterBkg: '#E8E6DC',
+        clusterBorder: '#B0AEA5',
+        edgeLabelBackground: '#FAF9F5',
+        mainBkg: '#FAF9F5',
+        nodeBorder: '#D97757',
+        fontFamily: 'SF Pro TC, PingFang TC, Noto Sans TC, sans-serif'
+      }
+    });
+
+    window.CodexRenderer = {
+      async renderMarkdownFromSource(markdownText, baseHref, sourceRootHref) {
+        try {
+          setBaseHref(baseHref);
+          content.innerHTML = '';
+          renderMarkdown(markdownText);
+          resolveRelativeAssetURLs(baseHref, sourceRootHref);
+          convertMermaidBlocks();
+          await mermaid.run({ querySelector: '.mermaid' });
+          await waitForMathJax();
+          await window.MathJax.typesetPromise([content]);
+          return 'ok';
+        } catch (error) {
+          content.innerHTML = `
+            <div class="callout orange">
+              <strong>渲染失敗：</strong>
+              <div style="margin-top:8px; white-space:pre-wrap;">${escapeHtml(String(error))}</div>
+            </div>
+          `;
+          throw error;
+        }
+      },
+
+      prepareSinglePageExport(width, height) {
+        ensureExportStyle(width, height);
+        return 'ok';
+      },
+
+      cleanupSinglePageExport() {
+        clearExportStyle();
+        return 'ok';
+      },
+
+      getExportMetrics() {
+        return getExportMetrics();
+      },
+
+      setExportScrollOffset(y) {
+        window.scrollTo(0, y);
+        return window.scrollY;
+      }
+    };
+  </script>
+</body>
+</html>
